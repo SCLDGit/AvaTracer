@@ -4,7 +4,7 @@
         <TargetFramework>net7.0</TargetFramework>
         <Nullable>enable</Nullable>
         <RootNamespace>AvaTracer3.Gui</RootNamespace>
-        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <AssemblyName>AvaTracer 3 GUI</AssemblyName>
     </PropertyGroup>
     <ItemGroup>
         <Folder Include="Models\" />

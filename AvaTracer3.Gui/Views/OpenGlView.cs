@@ -1,29 +1,36 @@
-using System;
+using System.Diagnostics;
 using System.Drawing;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
 using Avalonia.Threading;
 using AvaTracer3.Gui.Models.DataStructures.OpenGl;
-using Silk.NET.OpenGL;
-using Shader = AvaTracer3.Gui.Models.DataStructures.OpenGl.Shader;
+using AvaTracer3.Gui.Models.DataStructures.Primitives;
+using AvaTracer3.Gui.Models.Enumerations;
+using AvaTracer3.Gui.Models.Globals;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
 
 namespace AvaTracer3.Gui.Views;
 
 public class OpenGlView : OpenGlControlBase
 {
-    private GL                             m_gl;
-    private BufferObject<float>            m_vbo;
-    private BufferObject<uint>             m_ebo;
-    private VertexArrayObject<float, uint> m_vao;
-    private Shader                         m_shader;
+    private          BufferObject<Vertex3D>?            m_vbo;
+    private          BufferObject<uint>?                m_ebo;
+    private          VertexArrayObject<Vertex3D, uint>? m_vao;
+    private          Shader?                            m_shader;
+    private readonly Stopwatch                          m_time;
 
-    private static readonly float[] Vertices =
+    public OpenGlView()
     {
-        //X    Y      Z     R  G  B  A
-        0.5f, 0.5f, 0.0f, 1, 0, 0, 1,
-        0.5f, -0.5f, 0.0f, 0, 0, 0, 1,
-        -0.5f, -0.5f, 0.0f, 0, 0, 1, 1,
-        -0.5f, 0.5f, 0.5f, 0, 0, 0, 1
+        m_time = Stopwatch.StartNew();
+    }
+
+    private static readonly Vertex3D[] Vertices =
+    {
+        new (new Vector3(1.0f, 1.0f, 0.0f), new Color4(1.0f, 0.0f, 0.0f, 1.0f)),
+        new (new Vector3( 1.0f, -1.0f, 0.0f), new Color4(0.0f, 1.0f, 0.0f, 1.0f)),
+        new (new Vector3(-1.0f, -1.0f, 0.0f), new Color4( 0.0f, 0.0f, 1.0f, 1.0f)),
+        new (new Vector3(-1.0f, 1.0f, 1.0f), new Color4(0.0f, 0.0f, 0.0f, 1.0f))
     };
 
     private static readonly uint[] Indices =
@@ -35,44 +42,45 @@ public class OpenGlView : OpenGlControlBase
     protected override void OnOpenGlInit(GlInterface p_gl)
     {
         base.OnOpenGlInit(p_gl);
-
-        m_gl = GL.GetApi(p_gl.GetProcAddress);
-
+        
+        GL.LoadBindings(new AvaloniaContext(p_gl));
+        
         //Instantiating our new abstractions
-        m_ebo = new BufferObject<uint>(m_gl, Indices, BufferTargetARB.ElementArrayBuffer);
-        m_vbo = new BufferObject<float>(m_gl, Vertices, BufferTargetARB.ArrayBuffer);
-        m_vao = new VertexArrayObject<float, uint>(m_gl, m_vbo, m_ebo);
+        m_ebo = new BufferObject<uint>(Indices, BufferTarget.ElementArrayBuffer);
+        m_vbo = new BufferObject<Vertex3D>(Vertices, BufferTarget.ArrayBuffer);
+        m_vao = new VertexArrayObject<Vertex3D, uint>(m_vbo, m_ebo);
 
         //Telling the VAO object how to lay out the attribute pointers
-        m_vao.VertexAttributePointer(0, 3, VertexAttribPointerType.Float, 7, 0);
-        m_vao.VertexAttributePointer(1, 4, VertexAttribPointerType.Float, 7, 3);
+        m_vao.VertexAttributePointer(0, 3, VertexAttribPointerType.Float, PrimitiveSizeData.WorldPositionOffset);
+        m_vao.VertexAttributePointer(1, 4, VertexAttribPointerType.Float, PrimitiveSizeData.ColorOffset);
 
-        m_shader = new Shader(m_gl, "shader.vert", "shader.frag");
+        m_shader = new Shader(ShaderReadMode.ASSET, "backgroundShader.vert", "greenSwirlShader.frag");
     }
 
     protected override void OnOpenGlDeinit(GlInterface p_gl)
     {
-        m_vbo.Dispose();
-        m_ebo.Dispose();
-        m_vao.Dispose();
-        m_shader.Dispose();
+        m_vbo?.Dispose();
+        m_ebo?.Dispose();
+        m_vao?.Dispose();
+        m_shader?.Dispose();
         base.OnOpenGlDeinit(p_gl);
     }
 
-    protected override unsafe void OnOpenGlRender(GlInterface p_gl, int p_fb)
+    protected override void OnOpenGlRender(GlInterface p_gl, int p_fb)
     {
-        m_gl.ClearColor(Color.Firebrick);
-        m_gl.Clear((uint)(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit));
-        m_gl.Enable(EnableCap.DepthTest);
-        m_gl.Viewport(0, 0, (uint)Bounds.Width, (uint)Bounds.Height);
+        GL.ClearColor(Color.Firebrick);
+        GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+        GL.Enable(EnableCap.DepthTest);
+        GL.Viewport(0, 0, (int) Bounds.Width, (int) Bounds.Height);
 
-        m_ebo.Bind();
-        m_vbo.Bind();
-        m_vao.Bind();
-        m_shader.Use();
-        m_shader.SetUniform("uBlue", (float)Math.Sin(DateTime.Now.Millisecond / 1000f * Math.PI));
+        m_ebo?.Bind();
+        m_vbo?.Bind();
+        m_vao?.Bind();
+        m_shader?.Use();
+        m_shader?.SetUniform("time", (float) m_time.Elapsed.TotalSeconds);
+        m_shader?.SetUniform2("resolution", new Vector2((float) Bounds.Width, (float) Bounds.Height));
 
-        m_gl.DrawElements(PrimitiveType.Triangles, (uint)Indices.Length, DrawElementsType.UnsignedInt, null);
+        GL.DrawElements(PrimitiveType.Triangles, Indices.Length, DrawElementsType.UnsignedInt, 0);
         Dispatcher.UIThread.Post(RequestNextFrameRendering, DispatcherPriority.Background);
     }
 }
