@@ -1,37 +1,50 @@
 using System;
 using System.Runtime.InteropServices;
-using Silk.NET.OpenGL;
+using AvaTracer3.Gui.Models.DataStructures.Primitives;
+using AvaTracer3.Gui.Models.Globals;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
 
 namespace AvaTracer3.Gui.Models.DataStructures.OpenGl;
 
 public class BufferObject<TDataType> : IDisposable
     where TDataType : unmanaged
 {
-    private uint            m_handle;
-    private BufferTargetARB m_bufferType;
-    private GL              m_gl;
+    private int          m_handle;
+    private BufferTarget m_bufferType;
 
-    public unsafe BufferObject(GL p_gl, Span<TDataType> p_data, BufferTargetARB p_bufferType)
+    public BufferObject(Span<TDataType> p_data, BufferTarget p_bufferType)
     {
-        m_gl         = p_gl;
         m_bufferType = p_bufferType;
 
-        m_handle = m_gl.GenBuffer();
+        m_handle = GL.GenBuffer();
+
         Bind();
-        fixed (void* d = p_data)
-        {
-            m_gl.BufferData(p_bufferType, (nuint)(p_data.Length * Marshal.SizeOf<TDataType>()), d,
-                           BufferUsageARB.StaticDraw);
-        }
+
+        var stride = GetStride<TDataType>();
+
+        GL.BufferData(p_bufferType, stride * p_data.Length, p_data.ToArray(), BufferUsageHint.StaticDraw);
+    }
+
+    private static int GetStride<T>() where T : unmanaged
+    {
+        return typeof(T) switch
+               {
+                   { } vertexType when vertexType   == typeof(Vertex3D) => PrimitiveSizeData.VertexStride,
+                   { } vector3Type when vector3Type == typeof(Vector3)  => PrimitiveSizeData.Vector3Stride,
+                   { } uintType when uintType       == typeof(uint)     => sizeof(uint),
+                   { IsPrimitive: true }                                => Marshal.SizeOf<T>(),
+                   _                                                    => throw new ArgumentOutOfRangeException()
+               };
     }
 
     public void Bind()
     {
-        m_gl.BindBuffer(m_bufferType, m_handle);
+        GL.BindBuffer(m_bufferType, m_handle);
     }
 
     public void Dispose()
     {
-        m_gl.DeleteBuffer(m_handle);
+        GL.DeleteBuffer(m_handle);
     }
 }

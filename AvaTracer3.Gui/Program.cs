@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using Avalonia;
+using Avalonia.OpenGL;
 using Avalonia.ReactiveUI;
 
 namespace AvaTracer3.Gui
@@ -17,7 +19,10 @@ namespace AvaTracer3.Gui
         public static AppBuilder BuildAvaloniaApp()
             => AppBuilder.Configure<AvaTracer3GuiApp>()
                          .UsePlatformDetect()
-                         .With(new Win32PlatformOptions { RenderingMode = new [] { Win32RenderingMode.Wgl }})
+                         .With(new Win32PlatformOptions
+                               {
+                                   RenderingMode = new [] { Win32RenderingMode.Wgl }
+                               })
                          .LogToTrace()
                          .UseReactiveUI();
     }
